@@ -15,12 +15,19 @@
  */
 package org.openrewrite.java.migrate.util;
 
+import java.util.HashSet;
+import java.util.Set;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.analysis.dataflow.Dataflow;
+import org.openrewrite.analysis.dataflow.DataFlowNode;
+import org.openrewrite.analysis.dataflow.DataFlowSpec;
+import org.openrewrite.analysis.dataflow.analysis.SinkFlowSummary;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.JavaVisitor;
@@ -46,7 +53,7 @@ public class MigrateStringReaderToReaderOf extends Recipe {
     @Override
     public String getDescription() {
         return "Migrate `new StringReader(String)` to `Reader.of(CharSequence)` in Java 25+. " +
-                "This only applies when assigning to `Reader` variables or returning from methods that return `Reader`. " +
+                "This only applies when assigning to `Reader` variables, non-escaping variables, or returning from methods that return `Reader`. " +
                 "The new method creates non-synchronized readers which are more efficient when thread-safety is not required.";
     }
 
@@ -57,7 +64,7 @@ public class MigrateStringReaderToReaderOf extends Recipe {
                 new JavaVisitor<ExecutionContext>() {
                     @Override
                     public J visitVariableDeclarations(J.VariableDeclarations mV, ExecutionContext ctx) {
-                        if (TypeUtils.isOfClassType(mV.getTypeAsFullyQualified(), "java.io.Reader")) {
+                        if (TypeUtils.isOfClassType(mV.getTypeAsFullyQualified(), "java.io.Reader") || mV.getVariables().stream().noneMatch(v -> isPotentiallyEscaping(v, getCursor()))) {
                             return mV.withVariables(ListUtils.map(mV.getVariables(), v -> {
                                 maybeRemoveImport("java.io.StringReader");
                                 maybeAddImport("java.io.Reader");
@@ -71,7 +78,7 @@ public class MigrateStringReaderToReaderOf extends Recipe {
                     public J visitAssignment(J.Assignment a, ExecutionContext ctx) {
                         if (a.getVariable() instanceof J.Identifier) {
                             J.Identifier variable = (J.Identifier) a.getVariable();
-                            if (TypeUtils.isOfClassType(variable.getType(), "java.io.Reader")) {
+                            if (TypeUtils.isOfClassType(variable.getType(), "java.io.Reader") || !isPotentiallyEscaping(variable, getCursor())) {
                                 maybeRemoveImport("java.io.StringReader");
                                 maybeAddImport("java.io.Reader");
                                 return new TransformVisitor().visitNonNull(a, ctx, getCursor().getParentOrThrow());
@@ -118,6 +125,51 @@ public class MigrateStringReaderToReaderOf extends Recipe {
                 }
             }
             return expr;
+        }
+    }
+
+    private static boolean isPotentiallyEscaping(final J j, final Cursor cursor) {
+        return Dataflow
+                .startingAt(cursor)
+                .findSinks(new PotentialEscapeFlowSpec(j))
+                .map(SinkFlowSummary::isNotEmpty).orSome(Boolean.FALSE);
+    }
+
+    private static class PotentialEscapeFlowSpec extends DataFlowSpec {
+
+        private final J source;
+
+        private PotentialEscapeFlowSpec(final J source) {
+            this.source = source;
+        }
+
+        @Override
+        public boolean isSource(final DataFlowNode n) {
+            return n.getCursor().getValue() == source;
+        }
+
+        @Override
+        public boolean isSink(final DataFlowNode n) {
+            return isPotentiallyEscapingNode(n, new HashSet<>());
+        }
+
+        private static boolean isPotentiallyEscapingNode(final DataFlowNode node, final Set<DataFlowNode> visited) {
+            if (!visited.add(node))
+                return false;
+
+            final String astNode = node.getCursor().getValue();
+            System.out.println(astNode);
+/*
+            if (astNode instanceof J.Assignment ||
+                (astNode instanceof J.Identifier id && id.getType() instanceof JavaType.Variable var && (var.getOwner() == null || var.getOwner() instanceof JavaType.Method))) {
+
+                for (final var alias : node.getAliases())
+                    if (isPotentiallyEscapingNode(alias, visited)) return true;
+
+                return false;
+            }
+*/
+            return true;
         }
     }
 }
