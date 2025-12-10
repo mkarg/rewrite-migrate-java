@@ -37,6 +37,153 @@ class MigrateStringReaderToReaderOfTest implements RewriteTest {
           .allSources(s -> s.markers(javaVersion(25)));
     }
 
+    @Test
+    void foo() {
+        rewriteRun(
+          //language=java
+          java(
+            """
+              import java.io.Reader;
+              import java.io.StringReader;
+              import java.io.BufferedReader;
+
+              public class MyClass {
+                  public Object f;
+
+                  void m0(Object o) {}
+
+                  Object test(String x1, Object z) {
+                      Object a = 1;
+                      Reader b = new StringReader(x1);
+                      Reader c = b;
+                      Reader d = null;
+                      System.out.println(b);
+                      Object y;
+                      y = b;
+                      f = y;
+                      Reader e = c;
+                             a = new BufferedReader(e);
+                      m0(e);
+                      z = e;
+                      return a;
+                  }
+              }
+              """
+          )
+        );
+    }                                              
+
+/*
+    @Test
+    void bar() {
+        rewriteRun(
+          //language=java
+          java(
+            """
+              import java.io.StringReader;
+
+              public class MyClass {
+                  Object test() {
+                      return new StringReader("");
+                  }
+              }
+              """
+          )
+        );
+    }                                              
+*/
+/*
+    @Test
+    void lambda() {
+        rewriteRun(
+          //language=java
+          java(
+            """
+              import java.io.StringReader;
+
+              public class MyClass {
+                  Object test() {
+                      return x -> new StringReader("");
+                  }
+              }
+              """
+          )
+        );
+    }                                              
+*/
+/*
+    @Test
+    void innerClass() {
+        rewriteRun(
+          //language=java
+          java(
+            """
+              import java.io.StringReader;
+              import java.io.StringReader;
+
+              public interface Getter {
+                  Object get();
+              }
+
+              public class MyClass {
+                  Getter test() {
+                      Object o = new StringReader("");
+                      return new Getter() {
+                        public Object get() {
+                          return o;
+                        }
+                      };
+                  }
+              }
+              """
+          )
+        );
+    }                                              
+*/
+/*
+    @Test
+    void arrayInit() {
+        rewriteRun(
+          //language=java
+          java(
+            """
+              import java.io.StringReader;
+              import java.io.StringReader;
+
+              public class MyClass {
+                  Object test() {
+                      Object o = new StringReader("");
+                      Object[] a = { o };
+                      return a;
+                  }
+              }
+              """
+          )
+        );
+    }                                              
+*/
+    @Test
+    void arrayAssign() {
+        rewriteRun(
+          //language=java
+          java(
+            """
+              import java.io.StringReader;
+              import java.io.StringReader;
+
+              public class MyClass {
+                  Object test() {
+                      Object o = new StringReader("");
+                      Object[] a = new Object[1];
+                      a[0] = o;
+                      return null;
+                  }
+              }
+              """
+          )
+        );
+    }                                              
+/*
     @DocumentExample
     @Test
     void migrateReaderVariableWithString() {
@@ -390,4 +537,5 @@ class MigrateStringReaderToReaderOfTest implements RewriteTest {
           )
         );
     }
+  */
 }

@@ -36,8 +36,13 @@ import org.openrewrite.java.search.UsesJavaVersion;
 import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
+
+import java.nio.file.Paths;
+import java.nio.file.Files;
+import java.nio.file.StandardOpenOption;
 
 @EqualsAndHashCode(callSuper = false)
 @Value
@@ -63,8 +68,16 @@ public class MigrateStringReaderToReaderOf extends Recipe {
                 Preconditions.and(new UsesJavaVersion<>(25), new UsesMethod<>(STRING_READER_CONSTRUCTOR)),
                 new JavaVisitor<ExecutionContext>() {
                     @Override
+                    public J visitNewClass(J.NewClass expression, ExecutionContext ctx) {
+                        log("\nvisitNewClass: " + expression + ", cursor: " + getCursor() + ", cursor.getValue(): " + getCursor().getValue() + ", dataFlowNode: " + DataFlowNode.of(getCursor()) + " isPotentiallyEscaping: " + isPotentiallyEscaping(expression, getCursor()));
+                        return super.visitNewClass(expression, ctx);
+                    }
+/*
+                    @Override
                     public J visitVariableDeclarations(J.VariableDeclarations mV, ExecutionContext ctx) {
-                        if (TypeUtils.isOfClassType(mV.getTypeAsFullyQualified(), "java.io.Reader") || mV.getVariables().stream().noneMatch(v -> isPotentiallyEscaping(v, getCursor()))) {
+                        if (TypeUtils.isOfClassType(mV.getTypeAsFullyQualified(), "java.io.Reader") || mV.getVariables().stream().noneMatch(v -> {
+                            return isPotentiallyEscaping(v, getCursor());
+                        })) {
                             return mV.withVariables(ListUtils.map(mV.getVariables(), v -> {
                                 maybeRemoveImport("java.io.StringReader");
                                 maybeAddImport("java.io.Reader");
@@ -78,7 +91,7 @@ public class MigrateStringReaderToReaderOf extends Recipe {
                     public J visitAssignment(J.Assignment a, ExecutionContext ctx) {
                         if (a.getVariable() instanceof J.Identifier) {
                             J.Identifier variable = (J.Identifier) a.getVariable();
-                            if (TypeUtils.isOfClassType(variable.getType(), "java.io.Reader") || !isPotentiallyEscaping(variable, getCursor())) {
+                            if (TypeUtils.isOfClassType(variable.getType(), "java.io.Reader") || !isPotentiallyEscaping(a, getCursor())) {
                                 maybeRemoveImport("java.io.StringReader");
                                 maybeAddImport("java.io.Reader");
                                 return new TransformVisitor().visitNonNull(a, ctx, getCursor().getParentOrThrow());
@@ -100,6 +113,7 @@ public class MigrateStringReaderToReaderOf extends Recipe {
                         }
                         return super.visitReturn(r, ctx);
                     }
+*/
                 }
         );
     }
@@ -132,7 +146,8 @@ public class MigrateStringReaderToReaderOf extends Recipe {
         return Dataflow
                 .startingAt(cursor)
                 .findSinks(new PotentialEscapeFlowSpec(j))
-                .map(SinkFlowSummary::isNotEmpty).orSome(Boolean.FALSE);
+                .map(SinkFlowSummary::isNotEmpty)
+                .orSome(Boolean.FALSE);
     }
 
     private static class PotentialEscapeFlowSpec extends DataFlowSpec {
@@ -140,6 +155,7 @@ public class MigrateStringReaderToReaderOf extends Recipe {
         private final J source;
 
         private PotentialEscapeFlowSpec(final J source) {
+            log("PotentialEscapeFlowSpec " + source);
             this.source = source;
         }
 
@@ -150,26 +166,64 @@ public class MigrateStringReaderToReaderOf extends Recipe {
 
         @Override
         public boolean isSink(final DataFlowNode n) {
-            return isPotentiallyEscapingNode(n, new HashSet<>());
+            return isPotentiallyEscapingNode(n);
         }
 
-        private static boolean isPotentiallyEscapingNode(final DataFlowNode node, final Set<DataFlowNode> visited) {
-            if (!visited.add(node))
-                return false;
+        private boolean isPotentiallyEscapingNode(final DataFlowNode node) {
+            log("  isPotentiallyEscapingNode: " + node.getCursor().getValue() + " Class: " + node.getCursor().getValue().getClass() + " P: " + node.getCursor());
 
-            final String astNode = node.getCursor().getValue();
-            System.out.println(astNode);
-/*
-            if (astNode instanceof J.Assignment ||
-                (astNode instanceof J.Identifier id && id.getType() instanceof JavaType.Variable var && (var.getOwner() == null || var.getOwner() instanceof JavaType.Method))) {
+            final Object astNode = node.getCursor().getValue();
 
-                for (final var alias : node.getAliases())
-                    if (isPotentiallyEscapingNode(alias, visited)) return true;
-
-                return false;
+            boolean isArrayAssignment = false;
+            boolean isFieldAssignment = false;
+            final J.Assignment assignment = node.getCursor().firstEnclosing(J.Assignment.class);
+            if (assignment != null) {
+                Expression x = assignment.getVariable();
+                if (x instanceof J.Identifier) {
+                    J.Identifier identifier = (J.Identifier) x;
+                    JavaType.Variable type = identifier.getFieldType();
+                    if (type != null) {
+                        Object owner = type.getOwner();
+                        if (owner instanceof JavaType.Class) {
+                           log("            FIELD (Klassenvariable)"); // IST EINE SINK
+                           isFieldAssignment = true;
+                        } else if (owner instanceof JavaType.Method) {
+                           log("            PARAMETER (Methodenvariable)");
+                        }
+                    }
+                } else if (x instanceof J.ArrayAccess) {
+                    log("            ARRAY-ASSIGNMENT");
+                    isArrayAssignment = true;
+                }
             }
-*/
-            return true;
+            log("    Assignment: " + assignment + " / isFieldAssignment? " + isFieldAssignment + " / isArrayAssignment? " + isArrayAssignment);
+            log("    Return: " + node.getCursor().firstEnclosing(J.Return.class)); // IST EINE SINK
+            log("    MethodInvocation: " + node.getCursor().firstEnclosing(J.MethodInvocation.class)); // IST EINE SINK
+
+            boolean isSource = false;
+            final J.NewClass newClass = node.getCursor().firstEnclosing(J.NewClass.class);
+            if (newClass != null) {
+                log("    IsSource? " + isSource(node));
+                isSource = isSource(node);
+            }
+            log("    NewClass: " + newClass + " / isSource? " + isSource); // TODO IST EINE SINK, WENN ES NICHT DIE SOURCE IST
+
+            log("    Lambda: " + node.getCursor().firstEnclosing(J.Lambda.class)); // IST EINE SINK
+            // NOTE Verwendung in innerer Klasse ist nicht erkennbar.
+
+            log("  exit");
+
+            return false; // return true
         }
+    }
+
+    private static void log(final Object o){
+        try {
+            Files.write(Paths.get("xxx"), ("" + o + '\n').getBytes(), StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+        } catch (final Throwable t) {}
+    }
+
+    static {
+        log("---");
     }
 }
