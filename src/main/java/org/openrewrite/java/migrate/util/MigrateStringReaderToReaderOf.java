@@ -15,6 +15,8 @@
  */
 package org.openrewrite.java.migrate.util;
 
+import static java.lang.Boolean.FALSE;
+
 import java.util.HashSet;
 import java.util.Set;
 import lombok.EqualsAndHashCode;
@@ -68,9 +70,17 @@ public class MigrateStringReaderToReaderOf extends Recipe {
                 Preconditions.and(new UsesJavaVersion<>(25), new UsesMethod<>(STRING_READER_CONSTRUCTOR)),
                 new JavaVisitor<ExecutionContext>() {
                     @Override
-                    public J visitNewClass(J.NewClass expression, ExecutionContext ctx) {
-                        log("\nvisitNewClass: " + expression + ", cursor: " + getCursor() + ", cursor.getValue(): " + getCursor().getValue() + ", dataFlowNode: " + DataFlowNode.of(getCursor()) + " isPotentiallyEscaping: " + isPotentiallyEscaping(expression, getCursor()));
-                        return super.visitNewClass(expression, ctx);
+                    public J visitNewClass(J.NewClass newClass, ExecutionContext ctx) {
+                        log("\nvisitNewClass: " + newClass + ", cursor: " + getCursor() + ", cursor.getValue(): " + getCursor().getValue() + ", dataFlowNode: " + DataFlowNode.of(getCursor()) + " isPotentiallyEscaping: " + isPotentiallyEscaping(newClass, getCursor()));
+                        final JavaType newType = newClass.getType();
+                        if (TypeUtils.isOfClassType(newType, "java.io.StringReader") && !isPotentiallyEscaping(newClass, getCursor())) {
+                            log("   YES");
+                            maybeRemoveImport("java.io.StringReader");
+                            maybeAddImport("java.io.Reader");
+                            return new TransformVisitor().visitNonNull(newClass, ctx, getCursor().getParentOrThrow());
+                        }
+
+                        return super.visitNewClass(newClass, ctx);
                     }
 /*
                     @Override
@@ -147,7 +157,7 @@ public class MigrateStringReaderToReaderOf extends Recipe {
                 .startingAt(cursor)
                 .findSinks(new PotentialEscapeFlowSpec(j))
                 .map(SinkFlowSummary::isNotEmpty)
-                .orSome(Boolean.FALSE);
+                .orSome(FALSE);
     }
 
     private static class PotentialEscapeFlowSpec extends DataFlowSpec {
@@ -155,7 +165,6 @@ public class MigrateStringReaderToReaderOf extends Recipe {
         private final J source;
 
         private PotentialEscapeFlowSpec(final J source) {
-            log("PotentialEscapeFlowSpec " + source);
             this.source = source;
         }
 
@@ -166,57 +175,31 @@ public class MigrateStringReaderToReaderOf extends Recipe {
 
         @Override
         public boolean isSink(final DataFlowNode n) {
-            if (isSource(n))
-                return false;
-
             final Cursor cursor = n.getCursor();
 
-            log("  isPotentiallyEscapingNode? " + cursor.getValue());
+            if (cursor.firstEnclosing(J.Return.class) != null)
+                return true;
 
-            if (cursor.firstEnclosing(J.Return.class) != null) {
-                log("    Return");
-                return true; // IST EINE SINK
-            }
+            if (cursor.firstEnclosing(J.MethodInvocation.class) != null)
+                return true;
 
-            if (cursor.firstEnclosing(J.NewClass.class) != null) {
-                log("    Constructor");
-                return true; // IST EINE SINK
-            }
+            if (cursor.firstEnclosing(J.Lambda.class) != null)
+                return true;
 
-            if (cursor.firstEnclosing(J.MethodInvocation.class) != null) {
-                log("    MethodInvocation");
-                return true; // IST EINE SINK
-            }
-
-            if (cursor.firstEnclosing(J.Lambda.class) != null) {
-                log("    Lambda");
-                return true; // IST EINE SINK
-            }
-
-            boolean isArrayAssignment = false;
-            boolean isFieldAssignment = false;
             final J.Assignment assignment = cursor.firstEnclosing(J.Assignment.class);
             if (assignment != null) {
-                Expression x = assignment.getVariable();
-                if (x instanceof J.Identifier) {
-                    J.Identifier identifier = (J.Identifier) x;
-                    JavaType.Variable type = identifier.getFieldType();
-                    if (type != null) {
-                        Object owner = type.getOwner();
-                        if (owner instanceof JavaType.Class) {
-                           log("            FIELD (Klassenvariable)"); // IST EINE SINK
-                           return true;
-                        }
-                    }
-                } else if (x instanceof J.ArrayAccess) {
-                    log("            ARRAY-ASSIGNMENT"); // IST EINE SINK
+                final Expression variable = assignment.getVariable();
+                if (variable instanceof J.Identifier) {
+                    final J.Identifier identifier = (J.Identifier) variable;
+                    final JavaType.Variable type = identifier.getFieldType();
+                    if (type != null && type.getOwner() instanceof JavaType.Class)
+                        return true;
+                } else if (variable instanceof J.ArrayAccess)
                     return true;
-                }
             }
 
-            // NOTE Verwendung in innerer Klasse ist nicht erkennbar.
-
-            log("  is not escaping");
+            if (!isSource(n) && cursor.firstEnclosing(J.NewClass.class) != null)
+                return true;
 
             return false;
         }
