@@ -163,17 +163,16 @@ class MigrateStringReaderToReaderOfTest implements RewriteTest {
                                               
     @DocumentExample
     @Test
-    void migrateReaderVariableWithString() {
+    void migrateVariableWithString() {
         rewriteRun(
           //language=java
           java(
             """
-              import java.io.Reader;
               import java.io.StringReader;
 
               class Test {
                   void test(String content) {
-                      Reader reader = new StringReader(content);
+                      Object object = new StringReader(content);
                   }
               }
               """,
@@ -182,7 +181,7 @@ class MigrateStringReaderToReaderOfTest implements RewriteTest {
 
               class Test {
                   void test(String content) {
-                      Reader reader = Reader.of(content);
+                      Object object = Reader.of(content);
                   }
               }
               """
@@ -293,7 +292,7 @@ class MigrateStringReaderToReaderOfTest implements RewriteTest {
     }
 
     @Test
-    void migrateMultipleReaderVariables() {
+    void migrateMultipleVariables() {
         rewriteRun(
           //language=java
           java(
@@ -304,7 +303,7 @@ class MigrateStringReaderToReaderOfTest implements RewriteTest {
               class Test {
                   void test(String s1, String s2) {
                       Reader reader1 = new StringReader(s1);
-                      Reader reader2 = new StringReader(s2);
+                      Object object = new StringReader(s2);
                   }
               }
               """,
@@ -314,7 +313,7 @@ class MigrateStringReaderToReaderOfTest implements RewriteTest {
               class Test {
                   void test(String s1, String s2) {
                       Reader reader1 = Reader.of(s1);
-                      Reader reader2 = Reader.of(s2);
+                      Object object = Reader.of(s2);
                   }
               }
               """
