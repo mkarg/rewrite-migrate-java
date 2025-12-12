@@ -42,10 +42,6 @@ import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 
-import java.nio.file.Paths;
-import java.nio.file.Files;
-import java.nio.file.StandardOpenOption;
-
 @EqualsAndHashCode(callSuper = false)
 @Value
 public class MigrateStringReaderToReaderOf extends Recipe {
@@ -60,7 +56,7 @@ public class MigrateStringReaderToReaderOf extends Recipe {
     @Override
     public String getDescription() {
         return "Migrate `new StringReader(String)` to `Reader.of(CharSequence)` in Java 25+. " +
-                "This only applies when assigning to `Reader` variables, non-escaping variables, or returning from methods that return `Reader`. " +
+                "This only applies when assigning to `Reader` variables, non-escaping targets, or returning from methods that return `Reader`. " +
                 "The new method creates non-synchronized readers which are more efficient when thread-safety is not required.";
     }
 
@@ -179,15 +175,5 @@ public class MigrateStringReaderToReaderOf extends Recipe {
 
             return false;
         }
-    }
-
-    private static void log(final Object o){
-        try {
-            Files.write(Paths.get("xxx"), ("" + o + '\n').getBytes(), StandardOpenOption.CREATE, StandardOpenOption.APPEND);
-        } catch (final Throwable t) {}
-    }
-
-    static {
-        log("---");
     }
 }
