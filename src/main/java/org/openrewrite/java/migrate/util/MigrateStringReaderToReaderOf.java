@@ -70,24 +70,19 @@ public class MigrateStringReaderToReaderOf extends Recipe {
                 Preconditions.and(new UsesJavaVersion<>(25), new UsesMethod<>(STRING_READER_CONSTRUCTOR)),
                 new JavaVisitor<ExecutionContext>() {
                     @Override
-                    public J visitNewClass(J.NewClass newClass, ExecutionContext ctx) {
-                        log("\nvisitNewClass: " + newClass + ", cursor: " + getCursor() + ", cursor.getValue(): " + getCursor().getValue() + ", dataFlowNode: " + DataFlowNode.of(getCursor()) + " isPotentiallyEscaping: " + isPotentiallyEscaping(newClass, getCursor()));
-                        final JavaType newType = newClass.getType();
-                        if (TypeUtils.isOfClassType(newType, "java.io.StringReader") && !isPotentiallyEscaping(newClass, getCursor())) {
-                            log("   YES");
+                    public J visitNewClass(J.NewClass nc, ExecutionContext ctx) {
+                        if (TypeUtils.isOfClassType(nc.getType(), "java.io.StringReader") && !isPotentiallyEscaping(nc, getCursor())) {
                             maybeRemoveImport("java.io.StringReader");
                             maybeAddImport("java.io.Reader");
-                            return new TransformVisitor().visitNonNull(newClass, ctx, getCursor().getParentOrThrow());
+                            return new TransformVisitor().visitNonNull(nc, ctx, getCursor().getParentOrThrow());
                         }
 
-                        return super.visitNewClass(newClass, ctx);
+                        return super.visitNewClass(nc, ctx);
                     }
-/*
+
                     @Override
                     public J visitVariableDeclarations(J.VariableDeclarations mV, ExecutionContext ctx) {
-                        if (TypeUtils.isOfClassType(mV.getTypeAsFullyQualified(), "java.io.Reader") || mV.getVariables().stream().noneMatch(v -> {
-                            return isPotentiallyEscaping(v, getCursor());
-                        })) {
+                        if (TypeUtils.isOfClassType(mV.getTypeAsFullyQualified(), "java.io.Reader")) {
                             return mV.withVariables(ListUtils.map(mV.getVariables(), v -> {
                                 maybeRemoveImport("java.io.StringReader");
                                 maybeAddImport("java.io.Reader");
@@ -101,7 +96,7 @@ public class MigrateStringReaderToReaderOf extends Recipe {
                     public J visitAssignment(J.Assignment a, ExecutionContext ctx) {
                         if (a.getVariable() instanceof J.Identifier) {
                             J.Identifier variable = (J.Identifier) a.getVariable();
-                            if (TypeUtils.isOfClassType(variable.getType(), "java.io.Reader") || !isPotentiallyEscaping(a, getCursor())) {
+                            if (TypeUtils.isOfClassType(variable.getType(), "java.io.Reader")) {
                                 maybeRemoveImport("java.io.StringReader");
                                 maybeAddImport("java.io.Reader");
                                 return new TransformVisitor().visitNonNull(a, ctx, getCursor().getParentOrThrow());
@@ -123,7 +118,6 @@ public class MigrateStringReaderToReaderOf extends Recipe {
                         }
                         return super.visitReturn(r, ctx);
                     }
-*/
                 }
         );
     }
