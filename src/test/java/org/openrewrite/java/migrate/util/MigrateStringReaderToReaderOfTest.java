@@ -38,7 +38,7 @@ class MigrateStringReaderToReaderOfTest implements RewriteTest {
     }
 
     @Test
-    void doNotMigrateDirectReturn() {
+    void doNotMigrateReturn() {
         rewriteRun(
           //language=java
           java(
@@ -48,25 +48,6 @@ class MigrateStringReaderToReaderOfTest implements RewriteTest {
               public class MyClass {
                   Object test() {
                       return new StringReader("");
-                  }
-              }
-              """
-          )
-        );
-    }
-
-    @Test
-    void doNotMigrateIndirectReturn() {
-        rewriteRun(
-          //language=java
-          java(
-            """
-              import java.io.StringReader;
-
-              public class MyClass {
-                  Object test() {
-                      Object o = new StringReader("");
-                      return o;
                   }
               }
               """
@@ -87,6 +68,24 @@ class MigrateStringReaderToReaderOfTest implements RewriteTest {
                   void test() {
                       StringReader o = new StringReader("");
                       new BufferedReader(o);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doNotMigrateMethod() {
+        rewriteRun(
+          //language=java
+          java(
+            """
+              import java.io.StringReader;
+
+              public class MyClass {
+                  void test() {
+                      System.out.println(new StringReader(""));
                   }
               }
               """
