@@ -402,7 +402,7 @@ class MigrateStringReaderToReaderOfTest implements RewriteTest {
 
               class Test {
                   void test() {
-                      Reader reader = new StringReader("Hello World");
+                      Object object = new StringReader("Hello World");
                   }
               }
               """,
@@ -411,7 +411,7 @@ class MigrateStringReaderToReaderOfTest implements RewriteTest {
 
               class Test {
                   void test() {
-                      Reader reader = Reader.of("Hello World");
+                      Object object = Reader.of("Hello World");
                   }
               }
               """
