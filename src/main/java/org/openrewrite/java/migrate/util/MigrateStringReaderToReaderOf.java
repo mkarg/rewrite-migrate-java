@@ -175,15 +175,12 @@ public class MigrateStringReaderToReaderOf extends Recipe {
 
         @Override
         public boolean isSink(final DataFlowNode n) {
-            final Cursor cursor = n.getCursor();
+            final Cursor cursor = n.getCursor().getParentOrThrow();
 
-            if (cursor.firstEnclosing(J.Return.class) != null)
-                return true;
-
-            if (cursor.firstEnclosing(J.MethodInvocation.class) != null)
-                return true;
-
-            if (cursor.firstEnclosing(J.Lambda.class) != null)
+            if (cursor.firstEnclosing(J.Return.class) != null ||
+                cursor.firstEnclosing(J.NewClass.class) != null ||
+                cursor.firstEnclosing(J.MethodInvocation.class) != null ||
+                cursor.firstEnclosing(J.Lambda.class) != null)
                 return true;
 
             final J.Assignment assignment = cursor.firstEnclosing(J.Assignment.class);
@@ -197,9 +194,6 @@ public class MigrateStringReaderToReaderOf extends Recipe {
                 } else if (variable instanceof J.ArrayAccess)
                     return true;
             }
-
-            if (!isSource(n) && cursor.firstEnclosing(J.NewClass.class) != null)
-                return true;
 
             return false;
         }

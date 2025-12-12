@@ -36,43 +36,7 @@ class MigrateStringReaderToReaderOfTest implements RewriteTest {
           .parser(JavaParser.fromJavaVersion())
           .allSources(s -> s.markers(javaVersion(25)));
     }
-/*
-    @Test
-    void complex() {
-        rewriteRun(
-          //language=java
-          java(
-            """
-              import java.io.Reader;
-              import java.io.StringReader;
-              import java.io.BufferedReader;
 
-              public class MyClass {
-                  public Object f;
-
-                  void m0(Object o) {}
-
-                  Object test(String x1, Object z) {
-                      Object a = 1;
-                      Reader b = new StringReader(x1);
-                      Reader c = b;
-                      Reader d = null;
-                      System.out.println(b);
-                      Object y;
-                      y = b;
-                      f = y;
-                      Reader e = c;
-                             a = new BufferedReader(e);
-                      m0(e);
-                      z = e;
-                      return a;
-                  }
-              }
-              """
-          )
-        );
-    }                                              
-*/
     @Test
     void doNotMigrateReturn() {
         rewriteRun(
@@ -89,7 +53,27 @@ class MigrateStringReaderToReaderOfTest implements RewriteTest {
               """
           )
         );
-    }                                              
+    }
+
+    @Test
+    void doNotMigrateConstructor() {
+        rewriteRun(
+          //language=java
+          java(
+            """
+              import java.io.BufferedReader;
+              import java.io.StringReader;
+
+              public class MyClass {
+                  void test() {
+                      StringReader o = new StringReader("");
+                      new BufferedReader(o);
+                  }
+              }
+              """
+          )
+        );
+    }
 
     @Test
     void doNotMigrateLambda() {
@@ -101,14 +85,14 @@ class MigrateStringReaderToReaderOfTest implements RewriteTest {
 
               public class MyClass {
                   Object test() {
-                      return x -> new StringReader("");
+                      return x -> new StringReader("lambda");
                   }
               }
               """
           )
         );
-    }                                              
-/*
+    }
+
     @Test
     void doNotMigrateAnonymousClass() {
         rewriteRun(
@@ -135,7 +119,6 @@ class MigrateStringReaderToReaderOfTest implements RewriteTest {
           )
         );
     }
-*/
 
     @Test
     void doNotMigrateArrayLiteral() {
@@ -155,7 +138,7 @@ class MigrateStringReaderToReaderOfTest implements RewriteTest {
               """
           )
         );
-    }                                              
+    }
 
     @Test
     void doNotMigrateArrayAssign() {
@@ -234,7 +217,7 @@ class MigrateStringReaderToReaderOfTest implements RewriteTest {
           )
         );
     }
-/*
+
     @Test
     void migrateMethodReturningReader() {
         rewriteRun(
@@ -262,7 +245,7 @@ class MigrateStringReaderToReaderOfTest implements RewriteTest {
           )
         );
     }
-*/
+
     @Test
     void doNotMigrateMethodReturningStringReader() {
         rewriteRun(
@@ -338,7 +321,7 @@ class MigrateStringReaderToReaderOfTest implements RewriteTest {
           )
         );
     }
-/* TODO - Wieso wird dieser Fall nicht erkannt?
+
     @Test
     void doNotMigrateAsMethodArgument() {
         rewriteRun(
@@ -357,7 +340,6 @@ class MigrateStringReaderToReaderOfTest implements RewriteTest {
           )
         );
     }
-*/
 
     @Test
     void migrateInTryWithResources() {
@@ -390,7 +372,7 @@ class MigrateStringReaderToReaderOfTest implements RewriteTest {
           )
         );
     }
-/*
+
     @Test
     void migrateWithLiteral() {
         rewriteRun(
@@ -542,5 +524,4 @@ class MigrateStringReaderToReaderOfTest implements RewriteTest {
           )
         );
     }
-  */
 }
