@@ -47,7 +47,8 @@ class MigrateStringReaderToReaderOfTest implements RewriteTest {
 
               public class MyClass {
                   Object test() {
-                      return new StringReader("");
+                      Object o = new StringReader("");
+                      return o;
                   }
               }
               """
@@ -85,7 +86,8 @@ class MigrateStringReaderToReaderOfTest implements RewriteTest {
 
               public class MyClass {
                   void test() {
-                      System.out.println(new StringReader(""));
+                      Object o = new StringReader("");
+                      System.out.println(o);
                   }
               }
               """
@@ -103,7 +105,8 @@ class MigrateStringReaderToReaderOfTest implements RewriteTest {
 
               public class MyClass {
                   Object test() {
-                      return x -> new StringReader("lambda");
+                      Object o = new StringReader("");
+                      return x -> o;
                   }
               }
               """
@@ -411,6 +414,27 @@ class MigrateStringReaderToReaderOfTest implements RewriteTest {
               class Test {
                   void test() {
                       Object object = Reader.of("Hello World");
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doNotMigrateFieldAssignment() {
+        rewriteRun(
+          //language=java
+          java(
+            """
+              import java.io.Reader;
+              import java.io.StringReader;
+
+              class Test {
+                  private Object object;
+
+                  void test(String content) {
+                      object = new StringReader(content);
                   }
               }
               """
