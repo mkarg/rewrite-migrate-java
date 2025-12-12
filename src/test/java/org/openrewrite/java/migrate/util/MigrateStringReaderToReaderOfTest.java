@@ -370,7 +370,7 @@ class MigrateStringReaderToReaderOfTest implements RewriteTest {
 
               class Test {
                   void test(String content) throws Exception {
-                      try (Reader reader = new StringReader(content)) {
+                      try (AutoCloseable reader = new StringReader(content)) {
                           // use reader
                       }
                   }
@@ -381,7 +381,7 @@ class MigrateStringReaderToReaderOfTest implements RewriteTest {
 
               class Test {
                   void test(String content) throws Exception {
-                      try (Reader reader = Reader.of(content)) {
+                      try (AutoCloseable reader = Reader.of(content)) {
                           // use reader
                       }
                   }
