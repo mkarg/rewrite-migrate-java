@@ -17,8 +17,6 @@ package org.openrewrite.java.migrate.util;
 
 import static java.lang.Boolean.FALSE;
 
-import java.util.HashSet;
-import java.util.Set;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.Cursor;
