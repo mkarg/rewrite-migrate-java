@@ -169,17 +169,17 @@ public class MigrateStringReaderToReaderOf extends Recipe {
 
         @Override
         public boolean isSink(final DataFlowNode n) {
-            final Cursor cursor = n.getCursor().getParentOrThrow();
+            final J value = n.getCursor().getParentTreeCursor().getValue();
 
-            if (cursor.firstEnclosing(J.Return.class) != null ||
-                cursor.firstEnclosing(J.NewClass.class) != null ||
-                cursor.firstEnclosing(J.MethodInvocation.class) != null ||
-                cursor.firstEnclosing(J.Lambda.class) != null)
+            if (value instanceof J.Return ||
+                value instanceof J.NewClass ||
+                value instanceof J.MethodInvocation ||
+                value instanceof J.Lambda)
                 return true;
 
-            final J.Assignment assignment = cursor.firstEnclosing(J.Assignment.class);
-            if (assignment != null) {
-                final Expression variable = assignment.getVariable();
+            if (value instanceof J.Assignment) {
+                final J.Assignment a = (J.Assignment) value;
+                final Expression variable = a.getVariable();
                 if (variable instanceof J.Identifier) {
                     final J.Identifier identifier = (J.Identifier) variable;
                     final JavaType.Variable type = identifier.getFieldType();
