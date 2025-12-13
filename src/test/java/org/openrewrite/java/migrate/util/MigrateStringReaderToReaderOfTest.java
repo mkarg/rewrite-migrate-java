@@ -63,11 +63,12 @@ class MigrateStringReaderToReaderOfTest implements RewriteTest {
           java(
             """
               import java.io.BufferedReader;
+              import java.io.Reader;
               import java.io.StringReader;
 
               public class MyClass {
                   void test() {
-                      StringReader o = new StringReader("");
+                      Reader o = new StringReader("");
                       new BufferedReader(o);
                   }
               }
@@ -211,7 +212,7 @@ class MigrateStringReaderToReaderOfTest implements RewriteTest {
     }
 
     @Test
-    void migrateStringReaderVariable() {
+    void doNotMigrateStringReaderVariable() {
         rewriteRun(
           //language=java
           java(
@@ -221,16 +222,6 @@ class MigrateStringReaderToReaderOfTest implements RewriteTest {
               class Test {
                   void test(String content) {
                       StringReader reader = new StringReader(content);
-                  }
-              }
-              """,
-            """
-              import java.io.Reader;
-              import java.io.StringReader;
-
-              class Test {
-                  void test(String content) {
-                      StringReader reader = Reader.of(content);
                   }
               }
               """
